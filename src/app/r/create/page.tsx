@@ -9,7 +9,7 @@ import { CreateSubbreditPayload } from "@/lib/validators/subreddit";
 import { toast } from "@/hooks/use-toast";
 import { useCustomToast } from "@/hooks/use-custom-toast";
 
-const page = () => {
+const Page = () => {
   const [input, setInput] = useState<string>("");
   const router = useRouter();
   const { loginToast } = useCustomToast();
@@ -28,7 +28,7 @@ const page = () => {
         if (err.response?.status === 409) {
           return toast({
             title: "Subreddit already exists",
-            description: "Please choose a different ubreddit name",
+            description: "Please choose a different subreddit name",
             variant: "destructive",
           });
         }
@@ -101,4 +101,4 @@ const page = () => {
   );
 };
 
-export default page;
+export default Page;

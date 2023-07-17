@@ -1,47 +1,52 @@
 "use client";
-import React, { useRef } from "react";
+
+import { INFINITE_SCROLLING_PAGINATION_RESULTS } from "@/config";
 import { ExtendedPost } from "@/types/db";
 import { useIntersection } from "@mantine/hooks";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { INFINITE_SCROLLING_PAGINATION_RESULTS } from "@/config";
 import axios from "axios";
-import { useSession } from "next-auth/react";
+import { Loader2 } from "lucide-react";
+import { FC, useEffect, useRef } from "react";
 import Post from "./Post";
+import { useSession } from "next-auth/react";
 
-interface Props {
+interface PostFeedProps {
   initialPosts: ExtendedPost[];
-  subredditName: string;
+  subredditName?: string;
 }
 
-const PostFeed = ({ initialPosts, subredditName }: Props) => {
-  const lastPostRef = useRef<HTMLDivElement>(null);
+const PostFeed: FC<PostFeedProps> = ({ initialPosts, subredditName }) => {
+  const lastPostRef = useRef<HTMLElement>(null);
   const { ref, entry } = useIntersection({
     root: lastPostRef.current,
     threshold: 1,
   });
-
   const { data: session } = useSession();
 
-  const { data, fetchNextPage, isFetching } = useInfiniteQuery(
+  const { data, fetchNextPage, isFetchingNextPage } = useInfiniteQuery(
     ["infinite-query"],
     async ({ pageParam = 1 }) => {
       const query =
-        `/api/post?limit=${INFINITE_SCROLLING_PAGINATION_RESULTS}&page=${pageParam}` +
+        `/api/posts?limit=${INFINITE_SCROLLING_PAGINATION_RESULTS}&page=${pageParam}` +
         (!!subredditName ? `&subredditName=${subredditName}` : "");
 
       const { data } = await axios.get(query);
       return data as ExtendedPost[];
     },
+
     {
       getNextPageParam: (_, pages) => {
         return pages.length + 1;
       },
-      initialData: {
-        pages: [initialPosts],
-        pageParams: [1],
-      },
+      initialData: { pages: [initialPosts], pageParams: [1] },
     }
   );
+
+  useEffect(() => {
+    if (entry?.isIntersecting) {
+      fetchNextPage(); // Load more posts when the last post comes into view
+    }
+  }, [entry, fetchNextPage]);
 
   const posts = data?.pages.flatMap((page) => page) ?? initialPosts;
 
@@ -59,27 +64,37 @@ const PostFeed = ({ initialPosts, subredditName }: Props) => {
         );
 
         if (index === posts.length - 1) {
+          // Add a ref to the last post in the list
           return (
             <li key={post.id} ref={ref}>
               <Post
-                subredditName={post.subreddit.name}
                 post={post}
                 commentAmt={post.comments.length}
-                currentVote={currentVote}
+                subredditName={post.subreddit.name}
                 votesAmt={votesAmt}
+                currentVote={currentVote}
               />
             </li>
           );
         } else {
-          <Post
-            subredditName={post.subreddit.name}
-            post={post}
-            commentAmt={post.comments.length}
-            currentVote={currentVote}
-            votesAmt={votesAmt}
-          />;
+          return (
+            <Post
+              key={post.id}
+              post={post}
+              commentAmt={post.comments.length}
+              subredditName={post.subreddit.name}
+              votesAmt={votesAmt}
+              currentVote={currentVote}
+            />
+          );
         }
       })}
+
+      {isFetchingNextPage && (
+        <li className="flex justify-center">
+          <Loader2 className="w-6 h-6 text-zinc-500 animate-spin" />
+        </li>
+      )}
     </ul>
   );
 };
